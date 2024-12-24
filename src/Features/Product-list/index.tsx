@@ -31,6 +31,7 @@ const ProductList: React.FC = () => {
   const [price, setPrice] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [rating, setRating] = useState<number>();
+  const [hideLoadMore, setHideLoadMore] = useState<boolean>(false);
   const [isOpenModal, setOpenModal] = useState<boolean>(false);
   const {
     data = [],
@@ -39,19 +40,41 @@ const ProductList: React.FC = () => {
   } = useGetPostsQuery({ limit, category });
 
   useEffect(() => {
+    if (!isFetching) setHideLoadMore(false);
+  }, [category]);
+
+  useEffect(() => {
+    if (!isFetching && (posts.length < limit || data.length === 20)) {
+      setHideLoadMore(true);
+    } else {
+      setHideLoadMore(false);
+    }
+  }, [posts, price, rating]);
+
+  useEffect(() => {
     if (data.length) setPosts(data);
   }, [data]);
 
   useEffect(() => {
-    const updatedData = price
-      ? [...data].sort((a, b) => {
+    if (posts.length && !isFetching) {
+      let updatedData = [...data];
+
+      if (rating) {
+        updatedData = updatedData.filter((e) =>
+          rating ? e.rating.rate === rating : e
+        );
+      }
+
+      if (price) {
+        updatedData = updatedData.sort((a, b) => {
           if (price === "descending") return b.price - a.price;
           return a.price - b.price;
-        })
-      : data;
+        });
+      }
 
-    setPosts(updatedData);
-  }, [price, data]);
+      setPosts(updatedData);
+    }
+  }, [price, rating]);
 
   return (
     <Box>
@@ -75,6 +98,7 @@ const ProductList: React.FC = () => {
           options={[]}
           onChange={(value) => {
             setLimit(5);
+            setRating(undefined);
             setCategory(typeof value === "string" ? value : value.toString());
           }}
           value={category ?? ""}
@@ -91,7 +115,7 @@ const ProductList: React.FC = () => {
           type="Rating"
           options={[
             ...new Set(
-              posts.map((post) => post.rating.rate).sort((a, b) => b - a)
+              data.map((post) => post.rating.rate).sort((a, b) => b - a)
             ),
           ]}
           onChange={(value) =>
@@ -110,43 +134,37 @@ const ProductList: React.FC = () => {
           }}
           gap={1}
         >
-          {posts
-            .filter((e) => (rating ? e.rating.rate === rating : e))
-            .map((post: Post) => (
-              <Box key={post.id}>
-                <Card
-                  sx={{ height: "100%", cursor: "pointer" }}
-                  onClick={() => {
-                    setSelectedArticle(post);
-                    setOpenModal(true);
-                  }}
-                >
-                  <CardMedia
-                    component="img"
-                    height="164"
-                    loading="lazy"
-                    sx={{ objectFit: "contain" }}
-                    image={post.image}
-                    alt={post.title}
-                  />
-                  <CardContent>
-                    <Typography
-                      display="block"
-                      variant="caption"
-                      fontWeight={600}
-                      width="100%"
-                    >
-                      {post.title}
-                    </Typography>
-                    <Chip
-                      label={`$${post.price}`}
-                      color="primary"
-                      size="small"
-                    />
-                  </CardContent>
-                </Card>
-              </Box>
-            ))}
+          {posts.map((post: Post) => (
+            <Box key={post.id}>
+              <Card
+                sx={{ height: "100%", cursor: "pointer" }}
+                onClick={() => {
+                  setSelectedArticle(post);
+                  setOpenModal(true);
+                }}
+              >
+                <CardMedia
+                  component="img"
+                  height="164"
+                  loading="lazy"
+                  sx={{ objectFit: "contain" }}
+                  image={post.image}
+                  alt={post.title}
+                />
+                <CardContent>
+                  <Typography
+                    display="block"
+                    variant="caption"
+                    fontWeight={600}
+                    width="100%"
+                  >
+                    {post.title}
+                  </Typography>
+                  <Chip label={`$${post.price}`} color="primary" size="small" />
+                </CardContent>
+              </Card>
+            </Box>
+          ))}
 
           {!posts.length && !isLoading && (
             <Typography>No Data Found...</Typography>
@@ -159,13 +177,13 @@ const ProductList: React.FC = () => {
         </Box>
 
         <Box textAlign="center" mt={2}>
-          {!isLoading && limit < 20 && (
+          {!isLoading && !hideLoadMore && (
             <Button
               variant="contained"
               disabled={isFetching}
               onClick={() => setLimit(limit + 5)}
             >
-              {isFetching ? "Loading" : "Load More"}
+              {isFetching ? "Loading..." : "Load More"}
             </Button>
           )}
         </Box>
